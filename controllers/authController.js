@@ -53,36 +53,31 @@ exports.register = async (req, res) => {
 // @route   POST /api/auth/login
 exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, phone, password } = req.body;
 
-    // 1. Check if user exists
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({ message: 'Invalid credentials' });
+    // Build the search query: check for phone FIRST, then email
+    let searchQuery = {};
+    if (phone) {
+      searchQuery.phone = phone;
+    } else if (email) {
+      searchQuery.email = email;
+    } else {
+      return res.status(400).json({ message: "Please provide an email or phone number." });
     }
 
-    // 2. Check if password matches
+    // 1. Find the user in MongoDB
+    const user = await User.findOne(searchQuery);
+    if (!user) return res.status(400).json({ message: "Account not found. Please sign up!" });
+
+    // 2. Check the password
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: 'Invalid credentials' });
-    }
+    if (!isMatch) return res.status(400).json({ message: "Incorrect password!" });
 
-    // 3. Generate the JWT token
-    const token = jwt.sign(
-      { userId: user._id, role: user.role }, 
-      process.env.JWT_SECRET, 
-      { expiresIn: '7d' }
-    );
-
-    // 4. Send success response
-    res.status(200).json({
-      message: 'Login successful',
-      token,
-      user: { id: user._id, name: user.name, email: user.email, role: user.role }
-    });
-
+    // 3. Generate the keycard (Token)
+    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    
+    res.json({ token, role: user.role, name: user.name });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server Error during login' });
+    res.status(500).json({ error: error.message });
   }
 };

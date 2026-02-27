@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import io from 'socket.io-client';
 
-// Point this to your Node.js backend
-const API_URL = 'http://localhost:5000/api'; 
-const socket = io('http://localhost:5000');
+// Pointing to your LIVE Render Backend
+const API_URL = 'https://salon-backend-hlzb.onrender.com/api'; 
+const socket = io('https://salon-backend-hlzb.onrender.com');
 
 export default function CustomerView() {
   const [token, setToken] = useState(null);
