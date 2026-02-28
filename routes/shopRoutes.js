@@ -15,4 +15,7 @@ router.get('/:id', shopController.getShopById);
 router.post('/', authMiddleware, shopController.createShop);
 router.get('/owner/my-shop', authMiddleware, shopController.getMyShop); // Changed route slightly for better structure
 
+// Add this line with your other routes:
+router.put('/:id', authMiddleware, shopController.updateShop);
+
 module.exports = router;

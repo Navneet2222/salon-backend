@@ -12,7 +12,8 @@ const shopSchema = new mongoose.Schema({
   operatingHours: {
     open: { type: String, default: '09:00 AM' },
     close: { type: String, default: '09:00 PM' }
-  }
+  },
+  bannerImage: { type: String, default: "" } // <-- COMBINED: Added to store the photo
 }, { timestamps: true });
 
 module.exports = mongoose.model('Shop', shopSchema);

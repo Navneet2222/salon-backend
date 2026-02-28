@@ -95,3 +95,21 @@ exports.getShopById = async (req, res) => {
     res.status(500).json({ message: 'Server Error while fetching shop details' });
   }
 };
+
+exports.updateShop = async (req, res) => {
+  try {
+    const { name, address, bannerImage } = req.body;
+    // Find the shop by its ID and ensure the logged-in owner is the one updating it
+    const updatedShop = await Shop.findOneAndUpdate(
+      { _id: req.params.id, ownerId: req.user.id },
+      { name, address, bannerImage },
+      { new: true }
+    );
+    
+    if (!updatedShop) return res.status(404).json({ message: "Shop not found or unauthorized." });
+    
+    res.json(updatedShop);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
