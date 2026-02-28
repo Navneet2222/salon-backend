@@ -421,4 +421,15 @@ export default function OwnerDashboard() {
                     </div>
                     <div className="flex flex-col gap-2 min-w-[120px]">
                       {booking.status === 'pending' && <button onClick={() => handleUpdateStatus(booking._id, 'in-chair')} className="bg-yellow-500 text-white px-4 py-2 rounded-lg text-sm font-bold shadow hover:bg-yellow-600 transition-colors">Mark "In Chair"</button>}
-                      {booking.status === 'in-chair' && <button onClick={() => handleUpdateStatus(booking._id, 'completed')} className="bg-green-600 text-white px-4 py-2 rounded-
+                      {booking.status === 'in-chair' && <button onClick={() => handleUpdateStatus(booking._id, 'completed')} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow hover:bg-green-700 transition-colors">Mark "Done"</button>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
