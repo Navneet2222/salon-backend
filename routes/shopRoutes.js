@@ -3,19 +3,16 @@ const router = express.Router();
 const shopController = require('../controllers/shopController');
 const authMiddleware = require('../middleware/authMiddleware');
 
-// 1. PUBLIC ROUTES (Customers browsing the app)
-// These do not use authMiddleware because anyone can view shops
-router.get('/', shopController.getAllShops); 
-router.get('/:id', shopController.getShopById);
-
-// 2. PRIVATE ROUTES (Shop Owners managing their business)
-// These must use authMiddleware so only logged-in owners can make changes
-// Note: We place /my-shop above /:id in the routing logic if it was a generic GET, 
-// but since they are distinct paths, we are safe!
+// 1. Create a new shop (Requires Owner Login)
 router.post('/', authMiddleware, shopController.createShop);
-router.get('/owner/my-shop', authMiddleware, shopController.getMyShop); // Changed route slightly for better structure
 
-// Add this line with your other routes:
+// 2. Get the logged-in owner's specific shop (Requires Owner Login)
+router.get('/owner/my-shop', authMiddleware, shopController.getMyShop);
+
+// 3. Get ALL shops for the Customer Marketplace (Public - no token needed)
+router.get('/', shopController.getAllShops);
+
+// 4. Update an existing shop with new image/details (Requires Owner Login)
 router.put('/:id', authMiddleware, shopController.updateShop);
 
 module.exports = router;
