@@ -1,16 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const bookingController = require('../controllers/bookingController');
-const authMiddleware = require('../middleware/authMiddleware');
 
-// All booking routes require the user to be logged in
-router.use(authMiddleware);
+// Assuming you have an auth middleware to protect routes
+const authMiddleware = require('../middleware/authMiddleware'); 
 
-// Customer Routes
-router.post('/', bookingController.createBooking);
+// 1. Create a new booking (Customer)
+router.post('/', authMiddleware, bookingController.createBooking);
 
-// Shop Owner Routes
-router.get('/queue', bookingController.getShopQueue);
-router.put('/:id/status', bookingController.updateBookingStatus);
+// 2. Get the live queue for a specific shop (Owner/Customer)
+router.get('/queue', authMiddleware, bookingController.getQueue);
+
+// 3. Update booking status (Owner marks 'in-chair' or 'completed')
+router.put('/:id/status', authMiddleware, bookingController.updateStatus);
 
 module.exports = router;
