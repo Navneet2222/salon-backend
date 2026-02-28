@@ -49,11 +49,19 @@ export default function OwnerDashboard() {
     e.preventDefault();
     const endpoint = isLoginMode ? '/auth/login' : '/auth/register';
     
-    // Determine if input is email or phone for proper backend handling
+    // Determine if input is email or phone
     const isEmail = phoneOrEmail.includes('@');
+    
+    // Payload generation with placeholder email for phone registrations
     const payload = isLoginMode 
       ? { [isEmail ? 'email' : 'phone']: phoneOrEmail, password } 
-      : { name, [isEmail ? 'email' : 'phone']: phoneOrEmail, password, role: "shop_owner" };
+      : { 
+          name, 
+          [isEmail ? 'email' : 'phone']: phoneOrEmail, 
+          password, 
+          role: "shop_owner",
+          email: isEmail ? phoneOrEmail : `${phoneOrEmail}@shop.com` 
+        };
 
     try {
       const res = await fetch(`${API_URL}${endpoint}`, {
@@ -67,7 +75,8 @@ export default function OwnerDashboard() {
         setToken(data.token);
         fetchMyShop(data.token);
       } else {
-        alert(data.message || "Authentication failed. Please check your details.");
+        // THE FIX: Added 'data.error' so we can see EXACTLY what is failing in the DB
+        alert(data.message || data.error || "Authentication failed. Please check your details.");
       }
     } catch (error) { 
       console.error("Auth error:", error); 
@@ -83,7 +92,6 @@ export default function OwnerDashboard() {
       if (res.ok) {
         const shopData = await res.json();
         setMyShop(shopData);
-        // Pre-fill states for editing
         setShopName(shopData.name);
         setShopAddress(shopData.address);
         setBannerImage(shopData.bannerImage || '');
@@ -123,7 +131,7 @@ export default function OwnerDashboard() {
         alert("Storefront launched successfully!");
       } else {
         const data = await res.json();
-        alert(data.message || "Failed to create shop.");
+        alert(data.message || data.error || "Failed to create shop.");
       }
     } catch (error) { 
       console.error("Error creating shop:", error); 
@@ -203,7 +211,6 @@ export default function OwnerDashboard() {
         )}
       </header>
 
-      {/* --- PHASE 1: REGISTRATION / LOGIN --- */}
       {!token && (
         <div className="bg-white p-8 rounded-xl shadow-md max-w-md mx-auto border border-gray-200">
           <div className="text-center mb-6">
@@ -243,7 +250,6 @@ export default function OwnerDashboard() {
         </div>
       )}
 
-      {/* --- PHASE 2: SHOP SETUP (ONBOARDING) --- */}
       {token && !myShop && (
         <div className="bg-white p-8 rounded-xl shadow-xl border-t-4 border-blue-600 mb-8 max-w-lg mx-auto mt-10">
           <div className="text-center mb-6">
@@ -283,7 +289,6 @@ export default function OwnerDashboard() {
         </div>
       )}
 
-      {/* --- EDIT EXISTING SHOP VIEW --- */}
       {token && myShop && isEditingShop && (
         <div className="bg-white p-8 rounded-xl shadow-md mb-8 border border-gray-200">
           <div className="flex justify-between items-center mb-6 border-b pb-4">
@@ -312,7 +317,6 @@ export default function OwnerDashboard() {
         </div>
       )}
 
-      {/* --- PHASE 3: MAIN DASHBOARD VIEW --- */}
       {token && myShop && !isEditingShop && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="col-span-1 bg-white p-6 rounded-xl shadow-md h-fit border border-gray-100">
