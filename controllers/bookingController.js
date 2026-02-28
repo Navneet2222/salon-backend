@@ -1,101 +1,97 @@
 const Booking = require('../models/Booking');
+const Shop = require('../models/Shop');
+const User = require('../models/User');
 const Service = require('../models/Service');
+const twilio = require('twilio');
 
-// @desc    Create a new booking
-// @route   POST /api/bookings
-// @access  Private (Customers only)
+// Pulling secret keys from your .env file
+const accountSid = process.env.TWILIO_ACCOUNT_SID;
+const authToken = process.env.TWILIO_AUTH_TOKEN;
+const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
+
+// Initialize Twilio ONLY if you have added your keys (prevents crashes before you set it up)
+const client = accountSid && authToken ? twilio(accountSid, authToken) : null;
+
 exports.createBooking = async (req, res) => {
   try {
     const { shopId, serviceId, appointmentDate, timeSlot, advanceAmount } = req.body;
+    const customerId = req.user.id;
 
-    // 1. Double-check that the slot isn't already taken
-    const existingBooking = await Booking.findOne({
-      shopId,
-      appointmentDate,
-      timeSlot,
-      status: { $in: ['pending', 'confirmed', 'in-chair'] } // Ignore cancelled/completed slots
-    });
-
-    if (existingBooking) {
-      return res.status(400).json({ message: 'Sorry, this time slot was just taken!' });
-    }
-
-    // 2. Create the booking
+    // 1. Save the booking in MongoDB
     const newBooking = new Booking({
-      customerId: req.user.userId,
       shopId,
       serviceId,
+      customerId,
       appointmentDate,
       timeSlot,
-      payment: {
-        amount: advanceAmount,
-        status: advanceAmount > 0 ? 'advance_paid' : 'unpaid' // Simplified for MVP
-      }
+      payment: { amount: advanceAmount, status: 'pending' },
+      status: 'pending'
     });
-
     await newBooking.save();
 
-    // 3. THE MAGIC: Broadcast the new booking to the Shop Owner in real-time!
-    const io = req.app.get('io');
-    io.to(shopId.toString()).emit('newBooking', newBooking);
+    // 2. Fetch the data we need to write the SMS message
+    const shop = await Shop.findById(shopId);
+    const customer = await User.findById(customerId);
+    const service = await Service.findById(serviceId);
 
-    res.status(201).json({
-      message: 'Booking confirmed!',
-      booking: newBooking
-    });
+    // 3. Fire off the SMS (If Twilio is connected)
+    if (client && customer.phone) {
+      // Twilio requires the country code. We assume India (+91) if it's missing.
+      let phoneToText = customer.phone;
+      if (!phoneToText.startsWith('+')) {
+        phoneToText = '+91' + phoneToText; 
+      }
 
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server Error while creating booking' });
-  }
-};
+      const message = `Booking Confirmed! Your ${service.name} at ${shop.name} is scheduled for ${timeSlot}.`;
 
-// @desc    Get today's live queue for a shop
-// @route   GET /api/bookings/queue
-// @access  Private (Shop Owners only)
-exports.getShopQueue = async (req, res) => {
-  try {
-    // Note: In a real production app, you'd calculate "today's date" dynamically
-    // For this MVP, we will just fetch all active bookings for this owner's shop
-    const { shopId } = req.query; 
-
-    const queue = await Booking.find({ 
-      shopId,
-      status: { $in: ['pending', 'confirmed', 'in-chair'] }
-    }).populate('customerId', 'name phone').populate('serviceId', 'name durationMinutes');
-
-    res.status(200).json(queue);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server Error while fetching queue' });
-  }
-};
-
-// @desc    Update booking status (e.g., Mark as "In Chair" or "Completed")
-// @route   PUT /api/bookings/:id/status
-// @access  Private (Shop Owners only)
-exports.updateBookingStatus = async (req, res) => {
-  try {
-    const { status } = req.body; // 'in-chair', 'completed', 'cancelled'
-    const bookingId = req.params.id;
-
-    const booking = await Booking.findByIdAndUpdate(
-      bookingId, 
-      { status }, 
-      { new: true }
-    );
-
-    if (!booking) {
-      return res.status(404).json({ message: 'Booking not found' });
+      try {
+        await client.messages.create({
+          body: message,
+          from: twilioPhone,
+          to: phoneToText
+        });
+        console.log(`✅ SMS Sent Successfully to ${phoneToText}`);
+      } catch (smsError) {
+        console.error("❌ SMS Failed (Check Twilio logs):", smsError.message);
+        // Notice we don't throw an error here! We don't want a failed SMS to cancel the actual haircut.
+      }
+    } else if (!client) {
+        console.log("⚠️ Booking saved, but SMS skipped. Twilio keys are missing from .env!");
     }
 
-    // Broadcast the update so the customer app can see their status change!
-    const io = req.app.get('io');
-    io.to(booking.shopId.toString()).emit('queueUpdated', booking);
-
-    res.status(200).json({ message: `Booking marked as ${status}`, booking });
+    res.status(201).json(newBooking);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server Error while updating status' });
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getQueue = async (req, res) => {
+  try {
+    const { shopId } = req.query;
+    // Get all bookings for today for this specific shop
+    const today = new Date().toISOString().split('T')[0];
+    const queue = await Booking.find({ shopId, appointmentDate: today })
+      .populate('customerId', 'name phone')
+      .populate('serviceId', 'name durationMinutes price');
+      
+    res.json(queue);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.updateStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    const updatedBooking = await Booking.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true }
+    );
+    if (!updatedBooking) return res.status(404).json({ message: "Booking not found." });
+    
+    res.json(updatedBooking);
+  } catch(error) {
+    res.status(500).json({ error: error.message });
   }
 };
